@@ -19,9 +19,9 @@ tle = [1 23842 96021 19275.63666510 .00000119 0 0 0 9994 ;2 23842 0.0474 31.7281
 %% Chaser (B) Intitial State 
 eccB1 = 0 ;
 incB1 = incA1 ; %save that delta v!!! 
-delrB1 = [0; 100; 0]; %km, not close enough yet  
+delrB1 = [100; 0; 0]; %km, not close enough yet, drel_xo 
 rB1 = rA1 + delrB1 ;   %km, initial position of chaser
-vB1 = [0; 0; sqrt(mu_e/norm(rB1))] ;   %km/s, circular orbit 
+vB1 = [0; 0; sqrt(mu_e/norm(rB1))] ;   %km/s, circular orbit, update to math new rB1
 
 
 %% Potentially Useful Functions
