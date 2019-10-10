@@ -1,0 +1,26 @@
+function [r_rel, v_rel, a_rel] = relrva (r_A, v_A, r_B, v_B, mu_earth) 
+%Relative Position 
+h_AB = cross(r_A, v_A) ;
+    %comoving frame, LVLH    
+i_A = r_A/norm(r_A) ;
+k_A = h_AB/norm(h_AB) ; 
+j_A = cross(k_A,i_A) ;
+
+Qxx = [i_A'; j_A'; k_A'] ;
+
+av_A = h_AB/(norm(r_A)^2) ;    %angular velocity of A
+aa_A = -2*(dot(v_A,r_A)/(norm(r_A)^2)).*av_A ;    %angular acceleration of A
+
+abs_A = (-mu_earth/(norm(r_A)^3))*r_A ;     %absolute acceleration
+abs_B = (-mu_earth/(norm(r_B)^3))*r_B ;   %absolute acceleration
+
+r_relAB = r_B - r_A ;
+r_rel = Qxx*r_relAB ;
+
+v_relAB = (v_B - v_A - cross(av_A,r_relAB))*1000 ;
+v_rel = Qxx*v_relAB ;
+
+a_relAB = (abs_B - abs_A - cross(aa_A,r_relAB) - cross(av_A,(cross(av_A,r_relAB))) - (2*(cross(av_A,(v_relAB/1000)))))*1000 ;
+a_rel = Qxx*a_relAB ;
+
+end 
