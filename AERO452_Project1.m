@@ -16,13 +16,16 @@ tle = [1 23842 96021 19275.63666510 .00000119 0 0 0 9994 ;2 23842 0.0474 31.7281
 [incA1, epochA1, RAANA1, eccA1, argA1, MeA1, nA1] = tle_convert(tle) ;
 [rA1,vA1] = TLE_State(RAANA1,argA1,MeA1,nA1,incA1,eccA1) ;
 
+e_vecA1 = (1/mu_e)*(rA1.*(norm(vA1)^2-mu_e/norm(rA1)) - (norm(rA1)*dot(rA1/norm(rA1),vA1)).*vA1);
+thetaA1 = acos(dot(e_vecA1/eccA1,rA1/norm(rA1)));  %radians, position of A at t=0     
+
 %% Chaser (B) Intitial State 
 eccB1 = 0 ;
 incB1 = incA1 ; %save that delta v!!! 
-delrB1 = [100; 0; 0]; %km, not close enough yet, drel_xo 
+thetaB1 = thetaA1 ; 
+delrB1 = [100; 0; 0]; %km, not close enough yet, drelxo so B is orbiting above A   
 rB1 = rA1 + delrB1 ;   %km, initial position of chaser
-vB1 = [0; 0; sqrt(mu_e/norm(rB1))] ;   %km/s, circular orbit, update to math new rB1
-
+vB1 = sqrt(mu_e/norm(rB1)).*[-sin(thetaB1); eccB1+cos(thetaB1); 0] ;
 
 %% Potentially Useful Functions
 
@@ -48,7 +51,63 @@ JD = Jo + (tf/24) ;
         n = tle(2,8) ;    %mean motion at epoch 
      end 
 
-%COEs to State
+% COEs to RV
+     function [r, v] = sv_coes(coe,mu)
+h = coe(1);
+
+e = coe(2);
+
+RA = coe(3);
+
+incl = coe(4);
+
+w = coe(5);
+
+TA = coe(6);
+
+%...Equations 4.45 and 4.46 (rp and vp are column vectors):
+
+rp = (h^2/mu) * (1/(1 + e*cos(TA))) * (cos(TA)*[1;0;0] + sin(TA)*[0;1;0]);
+
+vp = (mu/h) * (-sin(TA)*[1;0;0] + (e + cos(TA))*[0;1;0]);
+
+%...Equation 4.34:
+
+R3_W = [ cos(RA) sin(RA) 0
+
+ -sin(RA) cos(RA) 0
+
+ 0 0 1];
+
+%...Equation 4.32:
+
+R1_i = [1 0 0
+
+ 0 cos(incl) sin(incl)
+
+ 0 -sin(incl) cos(incl)];
+
+%...Equation 4.34:
+
+R3_w = [ cos(w) sin(w) 0
+
+ -sin(w) cos(w) 0
+
+ 0 0 1];
+
+%...Equation 4.49:
+
+Q_pX = (R3_w*R1_i*R3_W)';
+
+%...Equations 4.51 (r and v are column vectors):
+
+r = Q_pX*rp;
+
+v = Q_pX*vp;
+
+end  
+
+%TLEs to State
 function [R,V] = TLE_State(RAAN,OMEGA,ME,MM,INC,ecc)
 
 %Given: RAAN,OMEGA = AoP, ME (Mean Anomaly), Mean Motion = MM, Inc, ecc 
@@ -91,3 +150,5 @@ R = QxX*transpose(R_peri);
 V = QxX*transpose(V_peri);
 
 end
+
+
