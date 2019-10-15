@@ -16,6 +16,8 @@ tle = [1 23842 96021 19275.63666510 .00000119 0 0 0 9994 ;2 23842 0.0474 31.7281
 [incA1, epochA1, RAANA1, eccA1, argA1, MeA1, nA1] = tle_convert(tle) ;
 [rA1,vA1] = TLE_State(RAANA1,argA1,MeA1,nA1,incA1,eccA1) ;
 
+nA1 = nA1/(24*3600) ; %rev/s
+
 e_vecA1 = (1/mu_e)*(rA1.*(norm(vA1)^2-mu_e/norm(rA1)) - (norm(rA1)*dot(rA1/norm(rA1),vA1)).*vA1);
 thetaA1 = acos(dot(e_vecA1/eccA1,rA1/norm(rA1)));  %radians, position of A at t=0     
 
@@ -41,47 +43,34 @@ drelv_B1 = (vB1 - vA1 - cross(av_A,drelrB1)) ;
 drelvB1 = Qxx*drelv_B1 ;
 
 %% Football: 20-40km relative position
-
-% for ii = 1:1000  
-%     tburn1(ii) = ii*24*3600; %s, time for burn
-%     [ drelrB2, drelvB2 ] = football(drelrB1, drelvB1, nA1, tburn1) ;
-%     if norm(drelrB2(1:3,ii))>20 && norm(drelrB2(1:3,ii))<40
-%          disp('tolerance met')
-%          disp(tburn1(ii)/(24*3600))
-%          break
-%      end 
-%  end
 drelvB2 = [(nA1*40*2); 0; 0] ; 
 drelrB2 = [0; 40; 0] ;
 tot_delta2 = drelvB2*2 ; 
 
-[drelv_tot] = reltwoimpulse (drelrB2, drelvB2, nA1, tburn1) ;
- 
+%% Vbar - Station Keeping 1km 
+drelvB3 = [0 ; 0; 0 ]; 
+drelrB3 = [0; 1; 0] ;
 
+[tot_delta3] = VbarStationkeeping(15*60, nA1, drelrB3, drelrB2, drelvB2, drelvB3) ;
+
+%% Vbar - Station Keeping 300m 
+drelvB4 = [0; 0; 0] ;
+drelrB4 = [0; .3; 0] ;
+
+[tot_delta4] = VbarStationkeeping(15*60, nA1, drelrB4, drelrB3, drelvB3, drelvB4) ;
+
+%% Coelliptical 20 m 
+drelvB5 = [0; ((-3/2)*nA1*.02); 0] ; 
+drelrB5 = [0; .020; 0] ; 
+
+[tot_delta5] = VbarStationkeeping(15*60, nA1, drelrB5, drelrB4, drelvB4, drelvB5) ;
+%% Hop to 5 m 
+
+%% Vbar Approach to 0m 
+
+tot_deltav = tot_delta2 + tot_delta3 + tot_delta4 + tot_delta5 ;
 %% Potentially Useful Functions
 
-function [ drelr, drelv ] = coelliptical (drelro, drelvo, n, t) 
-    %function performs coelliptical rendezvous manuever
-        %drelxo = constant, drelxdoto = 0
-nt = n*t ; 
-%% Co-Moving Frame
-drelxo = drelro(1) ; %km/s
-drelyo = drelro(2) ;
-drelzo = drelro(3) ;
-drelydoto = -((3/2)*n*drelxo) ;
-drelzdoto = drelvo(3) ;
-
-drelx =  drelxo ; 
-drelxdot = ((3*n*drelxo) + (2*drelydoto))*sin(n*t) ;
-drely =  -10*drelx ; 
-drelydot = (((6*n*drelxo) + (4*drelydoto))*cos(nt)) - ((6*n*drelxo) + (3*drelydoto)) ;
-drelz = (drelzo*cos(nt)) + ((drelzdoto/n)*sin(nt)) ;
-drelzdot = -(drelzo*n*sin(nt)) + (drelzdoto*cos(nt)) ;
-
-drelr = [drelx; drely; drelz] ;    %km
-drelv = [drelxdot; drelydot; drelzdot] ; %km/s
-
-end 
 
 %TLE to COEs 
      function [inc, epoch, RAAN, ecc, arg, Me, n] = tle_convert(tle)
@@ -93,62 +82,6 @@ end
         Me = tle(2,7) * (pi/180) ;    %radians, mean anomaly at epoch
         n = tle(2,8) ;    %mean motion at epoch 
      end 
-
-% COEs to RV
-     function [r, v] = sv_coes(coe,mu)
-h = coe(1);
-
-e = coe(2);
-
-RA = coe(3);
-
-incl = coe(4);
-
-w = coe(5);
-
-TA = coe(6);
-
-%...Equations 4.45 and 4.46 (rp and vp are column vectors):
-
-rp = (h^2/mu) * (1/(1 + e*cos(TA))) * (cos(TA)*[1;0;0] + sin(TA)*[0;1;0]);
-
-vp = (mu/h) * (-sin(TA)*[1;0;0] + (e + cos(TA))*[0;1;0]);
-
-%...Equation 4.34:
-
-R3_W = [ cos(RA) sin(RA) 0
-
- -sin(RA) cos(RA) 0
-
- 0 0 1];
-
-%...Equation 4.32:
-
-R1_i = [1 0 0
-
- 0 cos(incl) sin(incl)
-
- 0 -sin(incl) cos(incl)];
-
-%...Equation 4.34:
-
-R3_w = [ cos(w) sin(w) 0
-
- -sin(w) cos(w) 0
-
- 0 0 1];
-
-%...Equation 4.49:
-
-Q_pX = (R3_w*R1_i*R3_W)';
-
-%...Equations 4.51 (r and v are column vectors):
-
-r = Q_pX*rp;
-
-v = Q_pX*vp;
-
-end  
 
 %TLEs to State
 function [R,V] = TLE_State(RAAN,OMEGA,ME,MM,INC,ecc)
@@ -223,44 +156,39 @@ v_rel = Qxx*v_relAB ;
 end 
 
 %Two Impulse Relative 
-function [drelv_tot] = reltwoimpulse (drelro, drelvo, n, t) 
+function [deltav] = VbarStationkeeping(t,n,deltarfinal,deltarinital,vbeforeburn1,vafterburn2)
+%Outcome of maneuver is v-bar stationkeeping. Get onto orbit by using two
+%impulse maneuver
 
-drel_xo = drelro(1) ; 
-drel_yo = drelro(2) ;
-drel_zo = drelro(3) ;
-drel_xdoto = drelvo(1) ; %km/s
-drel_ydoto = drelvo(2) ;
-drel_zdoto = drelvo(3) ;
+%Inputs: maneuver time (t) in sec, mean motion,relative position after
+%maneuver, relative position before maneuver, velocity of chaser before
+%first impulse, velocity of chaser after second impulse
 
-A = (4/n)*sin(n*t) - (3*t) ;
-B = (2/n)*cos(n*t) - (2/n) ; 
-C = drel_yo + (6*drel_xo*sin(n*t)) - (6*n*drel_xo*t) ;
-D = sin(n*t)/n ; 
-E = (4*drel_xo) - (3*drel_xo*cos(n*t)) ; 
+%Outputs: delta v for first impulse (vector form), delta v for second 
+%impulse (vector form), total delta v for entire maneuver (scalar)
 
-drelydoto = ((B*E) - (C*D))/(B^2 + (A*D)) ; 
-drelxdoto = (-E + (B*drelydoto))/D ;
+phirr = [4-3*cos(n*t),0,0;...
+         6*(sin(n*t)-n*t),1,0;...
+         0,0,cos(n*t)];
+phirv = [(1/n)*sin(n*t),(2/n)*(1-cos(n*t)),0;...
+         (2/n)*(cos(n*t)-1),(1/n)*(4*sin(n*t)-3*n*t),0;...
+         0,0,(1/n)*sin(n*t)];
+phivr = [3*n*sin(n*t),0,0;...
+         6*n*(cos(n*t)-1),0,0;...
+         0,0,-n*sin(n*t)];
+phivv = [cos(n*t),2*sin(n*t),0;...
+         -2*sin(n*t),4*cos(n*t)-3,0;...
+         0,0,cos(n*t)];
+     
+vafterburn1 = inv(phirv)*(deltarfinal-phirr*deltarinital);
+v0 = vafterburn1 - vbeforeburn1;
 
-drelydoto_after = (((((6*drel_xo)*(n*t - sin(n*t)) - drel_yo))*n*sin(n*t)) - (2*n*drel_xo*(4-(3*cos(n*t)))*(1-cos(n*t))))/...
-    (((4*sin(n*t)-(3*n*t))*sin(n*t)) + (4*(1-cos(n*t))^2)) ;
-drelxdoto_after = -(n*drel_xo*(4-(3*cos(n*t))) + (2*(1-cos(n*t))*drelydoto))/sin(n*t) ;
-drelzdoto_after = -drel_zo*n*cot(n*t) ;
+vbeforeburn2 = phivr*deltarinital+phivv*vafterburn1;
+vf = vafterburn2 - vbeforeburn2;
 
-drelvo_after = [drelxdoto_after; drelydoto_after; drelzdoto_after] ;
-
-drelxdotf_before = (drelxdoto_after*cos(n*t)) + (((3*drel_xo*n)+(2*drelydoto_after))*sin(n*t)) ;
-drelydotf_before = -((6*n*drel_xo)+(3*drelydoto_after)) + (((6*n*drel_xo) + (4*drelydoto_after))*cos(n*t)) ;
-drelzdotf_before = (drelzdoto_after*cos(n*t)) - (drel_zo*n*sin(n*t)) ; 
-
-drelvf_before = [drelxdotf_before; drelydotf_before; drelzdotf_before] ;
-
-    %delvo_before is the initial relative velocity 
-drelvo_t = drelvo_after - drelvo ;
-    %delvf_after is zero 
-drelvf_t = -drelvf_before ; 
-
-drelv_tot= (norm(abs(drelvo_t) + abs(drelvf_t)))*1000 ; %m/s
-
+deltav0 = norm(v0); %total delta v required for first impulse
+deltavf = norm(vf); %total delta v required for second impulse
+deltav = deltav0+deltavf; %total delta v required for maneuver
 end
 
 function [xx,yy,zz] = earth_sphere(varargin)
